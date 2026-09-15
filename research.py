@@ -59,6 +59,20 @@ def run_searches(client, planned):
             all_results.append(r)
     return all_results, first_raw
 
+def interleave_results(results):
+    """Round-robin across search angles so each angle gets represented."""
+    if not results:
+        return []
+    by_angle = {}
+    for r in results:
+        by_angle.setdefault(r.get("_angle"), []).append(r)
+    groups = list(by_angle.values())
+    interleaved = []
+    for i in range(max(len(g) for g in groups)):
+        for g in groups:
+            if i < len(g):
+                interleaved.append(g[i])
+    return interleaved
 
 def dedupe_results(results):
     seen = {}
@@ -100,6 +114,7 @@ def synthesize(question, results, answer_box=None):
         title = (r.get("title") or "Untitled").strip()
         lines.append(f"[{i}] {title}")
         lines.append(f"    {r.get('link')}")
+        lines.append("")
     lines.append("")
 
     lines.append(
@@ -138,7 +153,8 @@ def main():
         print(f"Search failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    results = dedupe_results(raw)
+    results = interleave_results(dedupe_results(raw))
+
     print(f"Collected {len(results)} unique results.", file=sys.stderr)
 
     answer_box = (first_raw or {}).get("answer_box")
@@ -148,7 +164,7 @@ def main():
     print(report)
 
     if args.out:
-        with open(args.out, "w") as f:
+        with open(args.out, "w", encoding="utf-8") as f:
             f.write(report + "\n")
         print(f"\nSaved to {args.out}", file=sys.stderr)
 
